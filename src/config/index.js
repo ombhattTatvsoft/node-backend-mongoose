@@ -9,6 +9,7 @@ const config = {
     jwt:{
         access_secret : process.env.JWT_ACCESS_TOKEN_SECRET,
         access_expiry : process.env.JWT_ACCESS_TOKEN_EXPIRY,
+        access_expiry_extend : process.env.JWT_ACCESS_TOKEN_EXTENDED,
     },
     cookie:{
         domain : process.env.COOKIE_DOMAIN,
@@ -16,6 +17,11 @@ const config = {
     },
     cors:{
         origin : process.env.CORS_ORIGIN
+    },
+    google:{
+        client_id : process.env.GOOGLE_CLIENT_ID,
+        client_secret : process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri : process.env.GOOGLE_REDIRECT_URI
     },
     logLevel: process.env.LOG_LEVEL
 };
