@@ -7,7 +7,7 @@ import axios from "axios";
 import * as userService from "../modules/user/user.service.js";
 
 const COOKIE_OPTIONS = {
-  httpOnly: false,
+  httpOnly: true,
   secure: config.env === "production",
   sameSite: "Strict",
 };
@@ -21,17 +21,7 @@ export const login = async (email, password, remember, res) => {
   if (!user) throw new Error("Invalid credentials");
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
-  const payload = { id: user._id, role: user.role, email: user.email };
-  const accessToken = signAccessToken(payload);
-  res.cookie("accessToken", accessToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
-  });
-  return { user: { id: user._id, role: user.role, email: user.email } };
-};
-
-export const logout = (res) => {
-  res.clearCookie("accessToken");
+  return signAndSendToken(user,remember, res);
 };
 
 export const googleLogin = async (code, res) => {
@@ -55,16 +45,16 @@ export const googleLogin = async (code, res) => {
   } else if (!user.googleId) {
     user = await userService.updateUser(user._id, { googleId });
   }
-
-  // Issue your JWT
-  const accessToken = signAccessToken({
-    id: user._id,
-    role: user.role,
-    email: user.email,
-  });
-  res.cookie("accessToken", accessToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+  signAndSendToken(user,false, res);
   res.redirect(FRONTEND_URL);
 };
+
+const signAndSendToken = (user, remember, res) => {
+  const payload = { id: user._id, role: user.role, email: user.email };
+  const accessToken = signAccessToken(payload);
+  res.cookie("accessToken", accessToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
+  });
+  return { user: payload };
+}

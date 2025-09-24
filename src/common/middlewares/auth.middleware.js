@@ -3,7 +3,7 @@ import { verifyAccesToken } from "../utils/jwt.util.js";
 export const authenticate = (req,res,next) => {
     try {
         const {accessToken} = req.cookies;
-        if(!accessToken) throw new Error('Unauthorized');
+        if(!accessToken) throw new Error();
         req.user = verifyAccesToken(accessToken);
         next();
     } catch (error) {
