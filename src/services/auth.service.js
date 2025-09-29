@@ -3,13 +3,16 @@ import bcrypt from "bcryptjs";
 import { signAccessToken } from "../common/utils/jwt.util.js";
 import User from "../modules/user/user.model.js";
 import jwt from "jsonwebtoken";
-import axios from "axios";
+import axios, { HttpStatusCode } from "axios";
 import * as userService from "../modules/user/user.service.js";
+import userRepo from "../modules/user/user.repo.js";
+import { success } from "../common/utils/response.js";
 
-const COOKIE_OPTIONS = {
+export const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: config.env === "production",
   sameSite: "Strict",
+  path: "/",
 };
 const CLIENT_ID = config.google.client_id;
 const REDIRECT_URI = config.google.redirect_uri;
@@ -21,7 +24,22 @@ export const login = async (email, password, remember, res) => {
   if (!user) throw new Error("Invalid credentials");
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
-  return signAndSendToken(user,remember, res);
+  signAndSendToken(user,remember, res);
+  success({res:res,message:"Logged in successfully",data:{user}})
+};
+
+export const signup = async (email, password, res) => {
+  let user = await userService.getUserByEmail(email);
+  if (!user) {
+    user = await userRepo.create({ email, password });
+  } else if (!user.password) {
+    password = await bcrypt.hash(password, 10);
+    user = await userRepo.updateById(user._id, { password });
+  }
+  else
+    throw new Error("Email already in use");
+  signAndSendToken(user, false, res);
+  success({res:res,message:"Logged in successfully",data:{user}})
 };
 
 export const googleLogin = async (code, res) => {
@@ -41,9 +59,9 @@ export const googleLogin = async (code, res) => {
   // DB logic
   let user = await userService.getUserByEmail(email);
   if (!user) {
-    user = await userService.createUser({ email, googleId });
+    user = await userRepo.create({ email, googleId });
   } else if (!user.googleId) {
-    user = await userService.updateUser(user._id, { googleId });
+    user = await userRepo.updateById(user._id, { googleId });
   }
   signAndSendToken(user,false, res);
   res.redirect(FRONTEND_URL);
@@ -56,5 +74,4 @@ const signAndSendToken = (user, remember, res) => {
     ...COOKIE_OPTIONS,
     maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
   });
-  return { user: payload };
 }

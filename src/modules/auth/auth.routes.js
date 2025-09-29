@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { loginSchema } from "../user/user.schema.js";
-import { googleLogin, login } from "../../services/auth.service.js";
+import { loginSchema, singupSchema } from "../user/user.schema.js";
+import { COOKIE_OPTIONS, googleLogin, login, signup } from "../../services/auth.service.js";
 import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import config from "../../config/index.js";
+import { success } from "../../common/utils/response.js";
 
 const router = Router();
 
@@ -13,16 +14,29 @@ const REDIRECT_URI=config.google.redirect_uri;
 router.post("/login", validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password, remember } = req.body;
-    const result = await login(email, password, remember, res);
-    res.json(result);
+    return await login(email, password, remember, res);
   } catch (error) {
     next(error);
   }
 });
 
+router.post("/signup", validate(singupSchema), async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    return await signup(email, password, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("accessToken", COOKIE_OPTIONS);
+  return success({res, message:"Logged out successfully"});
+})
+
 router.get("/me", authenticate, async (req, res, next) => {
   try {
-    res.json({ user: req.user });
+    return success({res,data:{user : req.user}});
   } catch (error) {
     next(error);
   }

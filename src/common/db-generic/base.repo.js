@@ -8,22 +8,13 @@ export default class BaseRepo {
   }
 
   async findAll(query = {}) {
-    const { limit, skip, sort, ...filters } = query;
+   const { limit, skip, sort, ...filters } = query;
 
-    const options = {};
-    if (limit) options.limit = parseInt(limit);
-    if (skip) options.skip = parseInt(skip);
-    if (sort) options.sort = JSON.parse(sort);
     let dbQuery = this.model.find(filters);
-    if (options.sort) {
-      dbQuery = dbQuery.sort(options.sort);
-    }
-    if (typeof options.skip === "number") {
-      dbQuery = dbQuery.skip(options.skip);
-    }
-    if (typeof options.limit === "number") {
-      dbQuery = dbQuery.limit(options.limit);
-    }
+
+    if (sort) dbQuery = dbQuery.sort(JSON.parse(sort));
+    if (skip) dbQuery = dbQuery.skip(Number(skip));
+    if (limit) dbQuery = dbQuery.limit(Number(limit));
     return dbQuery.lean();
   }
 
