@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { loginSchema, singupSchema } from "../user/user.schema.js";
-import { COOKIE_OPTIONS, googleLogin, login, signup } from "../../services/auth.service.js";
+import { loginSchema, singupSchema } from "./auth.schema.js";
+import { COOKIE_OPTIONS, googleLogin, login, signup } from "./auth.service.js";
 import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import config from "../../config/index.js";
 import { success } from "../../common/utils/response.js";

@@ -1,12 +1,12 @@
-import config from "../config/index.js";
+import config from "../../config/index.js";
 import bcrypt from "bcryptjs";
-import { signAccessToken } from "../common/utils/jwt.util.js";
-import User from "../modules/user/user.model.js";
+import { signAccessToken } from "../../common/utils/jwt.util.js";
+import User from "../user/user.model.js";
 import jwt from "jsonwebtoken";
 import axios, { HttpStatusCode } from "axios";
-import * as userService from "../modules/user/user.service.js";
-import userRepo from "../modules/user/user.repo.js";
-import { success } from "../common/utils/response.js";
+import * as userService from "../user/user.service.js";
+import userRepo from "../user/user.repo.js";
+import { success } from "../../common/utils/response.js";
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
