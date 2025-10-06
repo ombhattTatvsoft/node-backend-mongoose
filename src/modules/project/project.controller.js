@@ -3,7 +3,7 @@ import * as projectService from './project.service.js';
 
 export const createProject = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
     const projectData = req.body;
     const project = await projectService.createProject(userId,projectData);
     success({res,status:201,message:"Project created successfully",data:{project}})

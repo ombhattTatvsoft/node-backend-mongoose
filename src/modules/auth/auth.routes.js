@@ -22,8 +22,8 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
 
 router.post("/signup", validate(singupSchema), async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    return await signup(email, password, res);
+    const { name, email, password } = req.body;
+    return await signup(name, email, password, res);
   } catch (error) {
     next(error);
   }

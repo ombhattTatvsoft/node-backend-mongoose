@@ -1,6 +1,7 @@
+import { ProjectMember } from "./project.model.js";
 import projectRepo from "./project.repo.js";
 
-export const createProject = async (userId,projectData) => {
+export const createProject = async (userId, projectData) => {
   const existingProject = await projectRepo.findOne({
     owner: userId,
     name: { $regex: `^${projectData.name.trim()}$`, $options: "i" },
@@ -12,11 +13,38 @@ export const createProject = async (userId,projectData) => {
     ...projectData,
     owner: userId,
   };
-  return await projectRepo.create(projectPayload);
+  const project = await projectRepo.create(projectPayload);
+  await ProjectMember.create({
+    projectId: project._id,
+    userId,
+    role: "owner",
+  });
+  for (const member of projectData.members) {
+    const { email, role } = member;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      await ProjectMember.create({
+        projectId: project._id,
+        userId: existingUser._id,
+        role: role,
+      });
+    } else {
+      await ProjectInvite.create({
+        projectId: project._id,
+        email,
+        role: role,
+        invitedBy: userId,
+      });
+    }
+  }
+  return project;
 };
 
 export const getProjects = async (query) => {
-  return await projectRepo.findAll(query);
+  return await projectRepo.findAll(query, [
+    { path: "owner", select: "_id name email" },
+    { path: "members.user", select: "_id name email" },
+  ]);
 };
 
 export const getProject = async (id) => {

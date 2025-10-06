@@ -3,27 +3,41 @@ export default class BaseRepo {
     this.model = model;
   }
 
+  populate(query,includes){
+    if (includes && includes.length > 0) {
+      for (const include of includes) {
+        query = query.populate(include);
+      }
+    }
+    return query;
+  }
+
   async create(data) {
     return this.model.create(data);
   }
 
-  async findAll(query = {}) {
-   const { limit, skip, sort, ...filters } = query;
+  async findAll(queryParams = {}, includes = [], projection={}) {
+    const { limit, skip, sort, ...filter } = queryParams;
+    let query = this.model.find(filter,projection);
+    query = this.populate(query,includes);
 
-    let dbQuery = this.model.find(filters);
+    if (sort) query = query.sort(sort);
+    if (skip) query = query.skip(Number(skip));
+    if (limit) query = query.limit(Number(limit));
 
-    if (sort) dbQuery = dbQuery.sort(JSON.parse(sort));
-    if (skip) dbQuery = dbQuery.skip(Number(skip));
-    if (limit) dbQuery = dbQuery.limit(Number(limit));
-    return dbQuery.lean();
+    return query.lean();
   }
 
-  async findOne(filter, projection = {}) {
-    return this.model.findOne(filter, projection).lean();
+  async findOne(filter = {}, includes = [], projection = {}) {
+    let query = this.model.findOne(filter, projection);
+    query = this.populate(query,includes);
+    return query.lean();
   }
 
-  async findById(id, projection = {}) {
-    return this.model.findById(id, projection).lean();
+  async findById(id, includes = [], projection = {}) {
+    let query = this.model.findById(id, projection);
+    query = this.populate(query,includes);
+    return query.lean();
   }
 
   async updateById(id, newData) {

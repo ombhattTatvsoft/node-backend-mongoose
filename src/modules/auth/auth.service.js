@@ -7,6 +7,7 @@ import axios, { HttpStatusCode } from "axios";
 import * as userService from "../user/user.service.js";
 import userRepo from "../user/user.repo.js";
 import { success } from "../../common/utils/response.js";
+import { ProjectInvite, ProjectMember } from "../project/project.model.js";
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -24,22 +25,21 @@ export const login = async (email, password, remember, res) => {
   if (!user) throw new Error("Invalid credentials");
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
-  signAndSendToken(user,remember, res);
-  success({res:res,message:"Logged in successfully",data:{user}})
+  signAndSendToken(user, remember, res);
+  success({ res: res, message: "Logged in successfully", data: { user } });
 };
 
-export const signup = async (email, password, res) => {
+export const signup = async (name, email, password, res) => {
   let user = await userService.getUserByEmail(email);
   if (!user) {
-    user = await userRepo.create({ email, password });
+    user = await userRepo.create({ name, email, password });
   } else if (!user.password) {
     password = await bcrypt.hash(password, 10);
     user = await userRepo.updateById(user._id, { password });
-  }
-  else
-    throw new Error("Email already in use");
+  } else throw new Error("Email already in use");
   signAndSendToken(user, false, res);
-  success({res:res,message:"Logged in successfully",data:{user}})
+  addIfInvited(user);
+  success({ res: res, message: "Logged in successfully", data: { user } });
 };
 
 export const googleLogin = async (code, res) => {
@@ -54,24 +54,44 @@ export const googleLogin = async (code, res) => {
   const { id_token } = tokenRes.data;
   // Decode user info
   const payload = jwt.decode(id_token);
-  const { email, sub: googleId } = payload;
+  const { name, email, sub: googleId } = payload;
 
   // DB logic
   let user = await userService.getUserByEmail(email);
   if (!user) {
-    user = await userRepo.create({ email, googleId });
+    user = await userRepo.create({ name, email, googleId });
   } else if (!user.googleId) {
     user = await userRepo.updateById(user._id, { googleId });
   }
-  signAndSendToken(user,false, res);
+  signAndSendToken(user, false, res);
+  addIfInvited(user);
   res.redirect(FRONTEND_URL);
 };
 
 const signAndSendToken = (user, remember, res) => {
-  const payload = { id: user._id, role: user.role, email: user.email };
+  const payload = {
+    _id: user._id,
+    name: user.name,
+    role: user.role,
+    email: user.email,
+  };
   const accessToken = signAccessToken(payload);
   res.cookie("accessToken", accessToken, {
     ...COOKIE_OPTIONS,
-    maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
+    maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
   });
-}
+};
+
+const addIfInvited = async (newUser) => {
+  const pendingInvites = await ProjectInvite.find({ email: newUser.email });
+
+  for (const invite of pendingInvites) {
+    await ProjectMember.create({
+      projectId: invite.projectId,
+      userId: newUser._id,
+      role: invite.role,
+    });
+    invite.status = "accepted";
+    await invite.save();
+  }
+};
