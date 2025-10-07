@@ -14,7 +14,8 @@ export const createProject = async (req, res, next) => {
 
 export const getProjects = async (req, res, next) => {
   try {
-    const projects = await projectService.getProjects(req.query);
+    const userId = req.user._id;
+    const projects = await projectService.getProjects(userId);
     success({res,data:{projects}})
   } catch (err) {
     next(err);

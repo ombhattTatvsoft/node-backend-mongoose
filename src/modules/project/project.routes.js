@@ -7,7 +7,7 @@ import * as projectController from "./project.controller.js";
 const router = Router();
 
 router.post('/', authenticate,validate(projectCreateSchema),projectController.createProject);
-router.get('/',authenticate,projectController.getProjects);
+router.get('/getProjects',authenticate,projectController.getProjects);
 router.get('/:id', authenticate,projectController.getProject);
 router.put('/:id', authenticate,validate(projectUpdateSchema),projectController.updateProject);
 router.delete('/:id', authenticate,projectController.deleteProject);

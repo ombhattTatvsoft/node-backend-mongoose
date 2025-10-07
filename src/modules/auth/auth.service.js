@@ -7,7 +7,8 @@ import axios, { HttpStatusCode } from "axios";
 import * as userService from "../user/user.service.js";
 import userRepo from "../user/user.repo.js";
 import { success } from "../../common/utils/response.js";
-import { ProjectInvite, ProjectMember } from "../project/project.model.js";
+import ProjectInvite from './../project/models/projectInvite.model.js';
+import ProjectMember from './../project/models/projectMember.model.js';
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -33,12 +34,12 @@ export const signup = async (name, email, password, res) => {
   let user = await userService.getUserByEmail(email);
   if (!user) {
     user = await userRepo.create({ name, email, password });
+    addIfInvited(user);
   } else if (!user.password) {
     password = await bcrypt.hash(password, 10);
     user = await userRepo.updateById(user._id, { password });
   } else throw new Error("Email already in use");
   signAndSendToken(user, false, res);
-  addIfInvited(user);
   success({ res: res, message: "Logged in successfully", data: { user } });
 };
 
@@ -60,11 +61,11 @@ export const googleLogin = async (code, res) => {
   let user = await userService.getUserByEmail(email);
   if (!user) {
     user = await userRepo.create({ name, email, googleId });
+    addIfInvited(user);
   } else if (!user.googleId) {
     user = await userRepo.updateById(user._id, { googleId });
   }
   signAndSendToken(user, false, res);
-  addIfInvited(user);
   res.redirect(FRONTEND_URL);
 };
 
@@ -83,15 +84,17 @@ const signAndSendToken = (user, remember, res) => {
 };
 
 const addIfInvited = async (newUser) => {
-  const pendingInvites = await ProjectInvite.find({ email: newUser.email });
-
-  for (const invite of pendingInvites) {
-    await ProjectMember.create({
-      projectId: invite.projectId,
+  const pendingInvites = await ProjectInvite.find({ email: newUser.email,status:"pending" });
+  if(!pendingInvites.length)
+    return;
+  const membersToInsert = pendingInvites.map((p) => ({
+    projectId: p.projectId,
       userId: newUser._id,
-      role: invite.role,
-    });
-    invite.status = "accepted";
-    await invite.save();
-  }
+      role: p.role,
+  }));
+  await ProjectMember.insertMany(membersToInsert);
+  await ProjectInvite.updateMany(
+    { email: newUser.email, status: "pending" },
+    { $set: { status: "accepted" } }
+  );
 };
