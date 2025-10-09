@@ -23,6 +23,14 @@ const config = {
         client_secret : process.env.GOOGLE_CLIENT_SECRET,
         redirect_uri : process.env.GOOGLE_REDIRECT_URI
     },
+    smtp: {
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
+        secure: process.env.SMTP_SECURE === "true",
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+        senderName: process.env.SMTP_SENDER_NAME || "MyApp Team",
+      },
     logLevel: process.env.LOG_LEVEL
 };
 

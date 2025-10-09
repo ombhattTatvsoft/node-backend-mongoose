@@ -7,8 +7,16 @@ import routes from './routes/index.js';
 import connectDB from "./db/mongoose.js";
 import { errorHandler } from "./common/middlewares/error.middleware.js";
 import { requestLogger } from "./middleware-global/requestLogger.js";
+import http from "http";
+import { Server } from "socket.io";
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: config.cors.origin, // update to your frontend URL
+  },
+});
 
 app.use(express.json());
 app.use(cookieParser());
@@ -26,9 +34,23 @@ app.use("/api", routes);
 
 app.use(errorHandler);
 
+io.on("connection", (socket) => {
+  console.log("A user connected: ", socket.id);
+
+  socket.on("joinUserRoom", (userId) => {
+    socket.join(userId); // each user has their own room
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected: ", socket.id);
+  });
+});
+
+export { io };
+
 const startServer = async () => {
   await connectDB();
-  app.listen(config.port, () => {
+  server.listen(config.port, () => {
     console.log(`🚀 Server running on http://localhost:${config.port}`);
   });
 };

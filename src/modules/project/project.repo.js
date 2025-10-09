@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import BaseRepo from "../../common/db-generic/base.repo.js";
 import Project from "./models/project.model.js";
 
@@ -7,11 +6,6 @@ class ProjectRepo extends BaseRepo {
     super(Project);
   }
   async getProjectsWithMembers(query = {}) {
-    for (const key in query) {
-      if (mongoose.isValidObjectId(query[key])) {
-        query[key] = new mongoose.Types.ObjectId(query[key]);
-      }
-    }
     const projects = await Project.aggregate([
       { $match: query },
       {

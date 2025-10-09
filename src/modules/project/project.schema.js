@@ -20,23 +20,3 @@ export const projectCreateSchema = Joi.object({
     )
     .optional(),
 });
-
-export const projectUpdateSchema = Joi.object({
-  name: Joi.string().trim().max(30),
-  description: Joi.string().allow("").max(200),
-  startDate: Joi.date().min("now"),
-  endDate: Joi.date().min(Joi.ref("startDate")),
-  status: Joi.string().valid("pending", "in-progress", "completed"),
-  members: Joi.array()
-    .items(
-      Joi.object({
-        user: Joi.string()
-          .regex(/^[0-9a-fA-F]{24}$/)
-          .required(),
-        role: Joi.string()
-          .valid("manager", "developer", "tester")
-          .default("developer"),
-      })
-    )
-    .optional(),
-}).min(1);
