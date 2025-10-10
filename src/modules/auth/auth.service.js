@@ -55,15 +55,15 @@ export const googleLogin = async (code, res) => {
   const { id_token } = tokenRes.data;
   // Decode user info
   const payload = jwt.decode(id_token);
-  const { name, email, sub: googleId } = payload;
+  const { name, email, sub: googleId, picture } = payload;
 
   // DB logic
   let user = await userService.getUserByEmail(email);
   if (!user) {
-    user = await userRepo.create({ name, email, googleId });
+    user = await userRepo.create({ name, email, googleId, avatar : picture });
     addIfInvited(user);
   } else if (!user.googleId) {
-    user = await userRepo.updateById(user._id, { googleId });
+    user = await userRepo.updateById(user._id, { googleId, avatar : picture });
   }
   signAndSendToken(user, false, res);
   res.redirect(FRONTEND_URL);
@@ -73,7 +73,6 @@ const signAndSendToken = (user, remember, res) => {
   const payload = {
     _id: user._id,
     name: user.name,
-    role: user.role,
     email: user.email,
   };
   const accessToken = signAccessToken(payload);

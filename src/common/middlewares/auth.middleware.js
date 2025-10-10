@@ -6,8 +6,11 @@ export const authenticate = async (req,res,next) => {
         const {accessToken} = req.cookies;
         if(!accessToken) throw new Error();
         const user = verifyAccesToken(accessToken);
-        if(await userService.getUserById(user._id))
-            req.user = user;
+        const userData = await userService.getUserById(user._id);
+        if(userData)
+            req.user = userData;
+        else
+            throw Error;
         // req.user = await userService.getUserByEmail(user.email);
         next();
     } catch (error) {

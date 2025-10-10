@@ -56,4 +56,33 @@ router.get("/google/callback", async (req, res) => {
   }
 });
 
+router.put('/change-password', authenticate, async (req, res, next) => {
+
+});
+router.put("/change-password", authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+router.put('/update-profile', authenticate,async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+});
+
 export default router;

@@ -7,9 +7,10 @@ import { userCreateSchema, userUpdateSchema } from "./user.schema.js";
 
 const router = Router();
 
+router.get('/:id', authenticate,isAdmin,userController.getUserById);
+
 router.post('/', authenticate,isAdmin,validate(userCreateSchema),userController.createUser);
 router.get('/',userController.getUsers);
-router.get('/:id', authenticate,isAdmin,userController.getUserById);
 router.put('/:id', authenticate,isAdmin,validate(userUpdateSchema),userController.updateUser);
 router.delete('/:id', authenticate,isAdmin,userController.deleteUser);
 

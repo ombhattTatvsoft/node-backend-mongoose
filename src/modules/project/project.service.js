@@ -6,7 +6,7 @@ import projectRepo from "./project.repo.js";
 import config from "../../config/index.js";
 import { sendEmail } from "../../common/utils/emailService.util.js";
 import { format } from "date-fns";
-import { sendNotification } from "../../common/utils/notificationService.util.js";
+import { sendNotification } from "../notification/notification.controller.js";
 
 export const createProject = async (userId, data) => {
   const name = data.name.trim();
@@ -86,7 +86,6 @@ export const deleteProject = async (id) => {
 async function syncProjectMembers(project, ownerId, members) {
   const projectId = project._id;
   const ownerStr = String(ownerId);
-  if (!members.length) return;
 
   const inputEmails = members.map((m) => m.email.toLowerCase().trim());
 
