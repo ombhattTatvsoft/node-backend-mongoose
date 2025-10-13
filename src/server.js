@@ -3,18 +3,20 @@ import config from "./config/index.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
-import routes from './routes/index.js';
+import routes from "./routes/index.js";
 import connectDB from "./db/mongoose.js";
 import { errorHandler } from "./common/middlewares/error.middleware.js";
 import { requestLogger } from "./middleware-global/requestLogger.js";
 import http from "http";
 import { Server } from "socket.io";
+import path from "path";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: config.cors.origin, // update to your frontend URL
+    origin: config.cors.origin,
+    credentials: true,
   },
 });
 
@@ -26,9 +28,23 @@ app.use(
     credentials: true,
   })
 );
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 app.use(requestLogger);
+
+app.use(
+  "/api/uploads",
+  express.static(path.join(process.cwd(), "uploads"), {
+    setHeaders: (res) => {
+      res.setHeader("Access-Control-Allow-Origin", config.cors.origin);
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  })
+);
 
 app.use("/api", routes);
 

@@ -3,12 +3,15 @@ import bcrypt from "bcryptjs";
 import { signAccessToken } from "../../common/utils/jwt.util.js";
 import User from "../user/user.model.js";
 import jwt from "jsonwebtoken";
-import axios, { HttpStatusCode } from "axios";
+import axios from "axios";
 import * as userService from "../user/user.service.js";
 import userRepo from "../user/user.repo.js";
 import { success } from "../../common/utils/response.js";
 import ProjectInvite from './../project/models/projectInvite.model.js';
 import ProjectMember from './../project/models/projectMember.model.js';
+import { fileURLToPath } from "url";
+import path from "path";
+import fs from "fs";
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -20,6 +23,8 @@ const CLIENT_ID = config.google.client_id;
 const REDIRECT_URI = config.google.redirect_uri;
 const CLIENT_SECRET = config.google.client_secret;
 const FRONTEND_URL = config.cors.origin;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const login = async (email, password, remember, res) => {
   const user = await User.findOne({ email });
@@ -63,11 +68,42 @@ export const googleLogin = async (code, res) => {
     user = await userRepo.create({ name, email, googleId, avatar : picture });
     addIfInvited(user);
   } else if (!user.googleId) {
-    user = await userRepo.updateById(user._id, { googleId, avatar : picture });
+    const payload = {googleId};
+    if(!user.avatar)
+      payload = {...payload, avatar : picture}
+    user = await userRepo.updateById(user._id, payload);
   }
   signAndSendToken(user, false, res);
   res.redirect(FRONTEND_URL);
 };
+
+export const changePassword = async (currentPassword, newPassword, userId, res) => {
+  const user = await userService.getUserById(userId);
+  if (!user) throw Error('User not found');
+  if(!user.password) throw Error('You have signed up using google, Sign up first using Password.')
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) throw Error('Current password is incorrect');
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await userRepo.updateById(userId, { password : hashedPassword });
+  success({res,message:'Password changed successfully'});
+}
+
+export const updateProfile = async (req,res) => {
+  const user = await userService.getUserById(req.user._id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const { name } = req.body;
+  if (name) user.name = name;
+  if (req.file) {
+    if (user.avatar) {
+      const oldPath = path.join(process.cwd(), "uploads", "avatars", path.basename(user.avatar));
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    user.avatar = `/uploads/avatars/${req.file.filename}`;
+  }
+  await user.save();
+  success({res,message:'Profile updated successfully',data:{user}});
+}
 
 const signAndSendToken = (user, remember, res) => {
   const payload = {
@@ -97,3 +133,34 @@ const addIfInvited = async (newUser) => {
     { $set: { status: "accepted" } }
   );
 };
+
+// router.put(
+//   "/update-profile",
+//   authenticate,
+//   upload.single("avatar"),
+//   async (req, res, next) => {
+//     try {
+//       const user = await User.findById(req.user._id);
+//       if (!user) return res.status(404).json({ message: "User not found" });
+
+//       const { name } = req.body;
+
+//       if (name) user.name = name;
+
+//       if (req.file) {
+//         if (user.avatar) {
+//           const oldPath = path.join(__dirname, "../uploads/avatars", path.basename(user.avatar));
+//           if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//         }
+
+//         user.avatar = `/uploads/avatars/${req.file.filename}`;
+//       }
+
+//       await user.save();
+
+//       res.status(200).json({ message: "Profile updated successfully", data: { user } });
+//     } catch (err) {
+//       next(err);
+//     }
+//   }
+// );

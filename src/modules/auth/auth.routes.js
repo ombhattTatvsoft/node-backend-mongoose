@@ -1,15 +1,45 @@
 import { Router } from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
 import { loginSchema, singupSchema } from "./auth.schema.js";
-import { COOKIE_OPTIONS, googleLogin, login, signup } from "./auth.service.js";
+import { changePassword, COOKIE_OPTIONS, googleLogin, login, signup, updateProfile } from "./auth.service.js";
 import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import config from "../../config/index.js";
 import { success } from "../../common/utils/response.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
 
 const CLIENT_ID=config.google.client_id;
 const REDIRECT_URI=config.google.redirect_uri;
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(process.cwd(), "uploads", "avatars");
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const fileName = `${req.user._id}${ext}`;
+    cb(null, fileName);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error("Only JPG, PNG files are allowed"));
+    }
+    cb(null, true);
+  },
+});
 
 router.post("/login", validate(loginSchema), async (req, res, next) => {
   try {
@@ -56,33 +86,22 @@ router.get("/google/callback", async (req, res) => {
   }
 });
 
-router.put('/change-password', authenticate, async (req, res, next) => {
-
-});
 router.put("/change-password", authenticate, async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
-
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    // Check current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
-
-    res.status(200).json({ message: "Password changed successfully" });
-  } catch (err) {
-    next(err);
+    const userId = req.user._id;
+    return await changePassword(currentPassword, newPassword, userId, res);
+  } catch (error) {
+    next(error);
   }
 });
-router.put('/update-profile', authenticate,async (req, res, next) => {
-  const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
+
+router.put("/update-profile", authenticate, upload.single("avatar"), async (req, res, next) => {
+  try {
+    return await updateProfile(req,res);
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

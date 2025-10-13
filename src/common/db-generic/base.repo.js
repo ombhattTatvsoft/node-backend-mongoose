@@ -37,7 +37,7 @@ export default class BaseRepo {
   async findById(id, includes = [], projection = {}) {
     let query = this.model.findById(id, projection);
     query = this.populate(query,includes);
-    return query.lean();
+    return query;
   }
 
   async updateById(id, newData) {
