@@ -6,28 +6,14 @@ import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import config from "../../config/index.js";
 import { success } from "../../common/utils/response.js";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { createStorage } from "../../common/utils/storageCreator.utils.js";
 
 const router = Router();
 
 const CLIENT_ID=config.google.client_id;
 const REDIRECT_URI=config.google.redirect_uri;
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(process.cwd(), "uploads", "avatars");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const fileName = `${req.user._id}${ext}`;
-    cb(null, fileName);
-  },
-});
+const storage = createStorage('avatar');
 
 const upload = multer({
   storage,

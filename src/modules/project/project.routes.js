@@ -10,6 +10,7 @@ router.post('/createProject', authenticate,validate(projectCreateSchema),project
 router.get('/getProjects',authenticate,projectController.getProjects);
 router.put('/editProject', authenticate,projectController.updateProject);
 router.delete('/deleteProject/:id', authenticate,projectController.deleteProject);
+router.get('/getProjectMembers/:id',projectController.getProjectMembers);
 
 // router.get('/:id', authenticate,projectController.getProject);
 

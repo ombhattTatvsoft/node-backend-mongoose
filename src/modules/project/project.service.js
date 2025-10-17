@@ -7,6 +7,8 @@ import config from "../../config/index.js";
 import { sendEmail } from "../../common/utils/emailService.util.js";
 import { format } from "date-fns";
 import { sendNotification } from "../notification/notification.controller.js";
+import Notification from "../notification/notification.model.js";
+import Task from "../task/task.model.js";
 
 export const createProject = async (userId, data) => {
   const name = data.name.trim();
@@ -38,11 +40,17 @@ export const getProjects = async (userId) => {
   return { myProjects, assignedProjects };
 };
 
-export const getProject = async (id) => {
-  const project = await projectRepo.findById(id);
-  if (!project) throw new Error("project not found");
-  return project;
+export const getProjectMembers = async (projectId) => {
+  const members = await ProjectMember.find({ projectId },"_id role joinedAt userId").populate('user','_id name email avatar');
+  const pendingMembers = await ProjectInvite.find({projectId},"_id email role");
+  return { members, pendingMembers };
 };
+
+// export const getProject = async (id) => {
+//   const project = await projectRepo.findById(id);
+//   if (!project) throw new Error("project not found");
+//   return project;
+// };
 
 export const updateProject = async (data) => {
   const projectId = data._id;
@@ -78,8 +86,10 @@ export const deleteProject = async (id) => {
   if (!existingProject) {
     throw new Error("project not found");
   }
-  await ProjectMember.deleteMany({ id });
-  await ProjectInvite.deleteMany({ id });
+  await ProjectMember.deleteMany({projectId : id});
+  await ProjectInvite.deleteMany({projectId : id});
+  await Notification.deleteMany({projectId : id});
+  await Task.deleteMany({projectId : id});
   return await projectRepo.deleteById(id);
 };
 

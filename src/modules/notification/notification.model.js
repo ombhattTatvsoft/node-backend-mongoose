@@ -11,4 +11,6 @@ const NotificationSchema = new mongoose.Schema({
 
 NotificationSchema.index({ userId: 1, read: 1 }); // important for fast querying
 
-export default mongoose.model("Notification", NotificationSchema);
+const Notification = mongoose.model("Notification", NotificationSchema);
+
+export default Notification;

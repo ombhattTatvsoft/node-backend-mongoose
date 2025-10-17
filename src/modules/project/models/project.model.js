@@ -16,8 +16,6 @@ const projectSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    // priority: {type:String,enum: ["low", "medium", "high"]},
-    // members: [projectMemberSchema],
   },
   { timestamps: true }
 );

@@ -1,6 +1,6 @@
 import { success } from "../../common/utils/response.js";
 import { io } from "../../server.js";
-import Notification from "./notification.schema.js";
+import Notification from "./notification.model.js";
 
 export const getNotifications = async (req, res ,next) => {
   try {
@@ -17,7 +17,8 @@ export const getNotifications = async (req, res ,next) => {
 export const markAllAsRead = async (req, res) => {
   try {
     const userId = req.user._id;
-    await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
+    // await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
+    await Notification.deleteMany({ userId});
     success({res,message:'All notifications marked as read'});
   } catch (err) {
     res.status(500).json({ error: "Failed to mark notifications as read" });

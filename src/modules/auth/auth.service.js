@@ -133,34 +133,3 @@ const addIfInvited = async (newUser) => {
     { $set: { status: "accepted" } }
   );
 };
-
-// router.put(
-//   "/update-profile",
-//   authenticate,
-//   upload.single("avatar"),
-//   async (req, res, next) => {
-//     try {
-//       const user = await User.findById(req.user._id);
-//       if (!user) return res.status(404).json({ message: "User not found" });
-
-//       const { name } = req.body;
-
-//       if (name) user.name = name;
-
-//       if (req.file) {
-//         if (user.avatar) {
-//           const oldPath = path.join(__dirname, "../uploads/avatars", path.basename(user.avatar));
-//           if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//         }
-
-//         user.avatar = `/uploads/avatars/${req.file.filename}`;
-//       }
-
-//       await user.save();
-
-//       res.status(200).json({ message: "Profile updated successfully", data: { user } });
-//     } catch (err) {
-//       next(err);
-//     }
-//   }
-// );
