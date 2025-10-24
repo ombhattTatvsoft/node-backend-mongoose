@@ -15,7 +15,7 @@ const isOwnerOrManager = (member) =>
 
 const mapFilesToAttachments = (files, userId) =>
   files.map((file) => ({
-    filename: file.filename,
+    fileName: file.filename,
     originalName: file.originalname,
     mimetype: file.mimetype,
     size: file.size,
@@ -113,8 +113,8 @@ export const editTask = async (userId, data, files) => {
   if (deletedFilenames?.length) {
     deleteFilesFromDisk(deletedFilenames);
     task.attachments = task.attachments.filter(
-      (a) => !deletedFilenames.includes(a.filename)
-    );
+      (a) => !deletedFilenames.includes(a.fileName)
+    )
   }
   await task.save();
   return task;
