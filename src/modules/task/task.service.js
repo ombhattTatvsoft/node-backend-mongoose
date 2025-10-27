@@ -94,7 +94,7 @@ export const editTask = async (userId, data, files) => {
   if (!isOwnerOrManager(member)) throw forbidden("You are not allowed to edit this task");
 
   const formattedTags =
-    typeof tags === "string" ? tags.trim().split(/\s+/) : tags;
+    typeof tags === "string" ? tags.trim().split(/,\s+/) : tags;
 
     Object.assign(task, {
       title,
@@ -165,7 +165,7 @@ export const deleteTask = async (userId, taskId) => {
   if (!isOwner(member) && !isCreator) {
     throw forbidden("You are not allowed to delete this task");
   }
-  deleteFilesFromDisk(task.attachments.map((a) => a.filename));
+  deleteFilesFromDisk(task.attachments.map((a) => a.fileName));
   await Task.findByIdAndDelete(taskId);
 };
 
@@ -184,7 +184,7 @@ export const saveTaskAttachments = async (
   if (deletedFilenames.length) {
     deleteFilesFromDisk(deletedFilenames);
     task.attachments = task.attachments.filter(
-      (a) => !deletedFilenames.includes(a.filename)
+      (a) => !deletedFilenames.includes(a.fileName)
     );
   }
 
