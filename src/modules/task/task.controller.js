@@ -36,6 +36,16 @@ export const getTasks = async (req, res, next) => {
   }
 };
 
+export const getTask = async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+    const task = await taskService.getTask(taskId);
+    success({ res, data: { task } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const updateTaskStatus = async (req, res, next) => {
   try {
     const userId = req.user._id;
@@ -61,9 +71,8 @@ export const deleteTask = async (req, res, next) => {
 export const saveTaskAttachments = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const { taskId } = req.params;
+    const { taskId, deletedFilennames } = req.body;
     const files = req.files;
-    const { deletedFilennames } = req.body;
     const updatedTask = await taskService.saveTaskAttachments(userId, taskId, files, deletedFilennames);
     success({
       res,
@@ -74,3 +83,13 @@ export const saveTaskAttachments = async (req, res, next) => {
     next(err);
   }
 };
+
+// export const addComment = async (req, res, next) => {
+//   try {
+//     const { taskId } = req.params;
+//     const task = await taskService.getTask(taskId);
+//     success({ res, data: { task } });
+//   } catch (err) {
+//     next(err);
+//   }
+// };

@@ -137,6 +137,17 @@ export const getTasks = async (userId, projectId) => {
   return tasks;
 };
 
+export const getTask = async (taskId) => {
+  const task = await Task.findById(taskId)
+    .populate("assignee", "_id name email avatar")
+    .populate("createdBy", "_id name email avatar")
+    .populate("updatedBy", "_id name email avatar")
+    .populate("comments.user", "_id name email avatar")
+    .sort({ createdAt: -1 });
+
+  return task;
+};
+
 export const updateTaskStatus = async (userId, taskId, newStatus) => {
   const task = await Task.findById(taskId);
   if (!task) throw notFound("Task not found");

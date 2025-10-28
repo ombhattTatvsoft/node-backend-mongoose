@@ -16,6 +16,18 @@ const attachmentSchema = new mongoose.Schema(
   }
 );
 
+const commentSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+  }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     projectId: {
@@ -53,6 +65,7 @@ const taskSchema = new mongoose.Schema(
     },
     tags: [{ type: String }],
     attachments: [attachmentSchema],
+    comments: [commentSchema],
   },
   { timestamps: true }
 );
