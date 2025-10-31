@@ -13,7 +13,7 @@ export const createStorage = (foldername) => {
       },
       filename: function (req, file, cb) {
         const ext = path.extname(file.originalname);
-        const fileName = `${req.user._id} ${foldername==='avatar' ? '' : `${Math.round(Math.random() * 1e9)}`} ${ext}`;
+        const fileName = `${req.user._id} ${foldername==='avatars' ? '' : `${Math.round(Math.random() * 1e9)}`} ${ext}`;
         cb(null, fileName);
       },
     });

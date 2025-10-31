@@ -38,8 +38,9 @@ export const getTasks = async (req, res, next) => {
 
 export const getTask = async (req, res, next) => {
   try {
+    const userId = req.user._id;
     const { taskId } = req.params;
-    const task = await taskService.getTask(taskId);
+    const task = await taskService.getTask(taskId, userId);
     success({ res, data: { task } });
   } catch (err) {
     next(err);
@@ -71,25 +72,25 @@ export const deleteTask = async (req, res, next) => {
 export const saveTaskAttachments = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const { taskId, deletedFilennames } = req.body;
+    const { taskId, deletedFilenames } = req.body;
     const files = req.files;
-    const updatedTask = await taskService.saveTaskAttachments(userId, taskId, files, deletedFilennames);
+    await taskService.saveTaskAttachments(userId, taskId, files, deletedFilenames);
     success({
       res,
       message: "Attachments saved successfully",
-      data: { task: updatedTask },
     });
   } catch (err) {
     next(err);
   }
 };
 
-// export const addComment = async (req, res, next) => {
-//   try {
-//     const { taskId } = req.params;
-//     const task = await taskService.getTask(taskId);
-//     success({ res, data: { task } });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
+export const addComment = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { taskId,text } = req.body;
+    await taskService.addComment(userId, taskId, text);
+    success({ res });
+  } catch (err) {
+    next(err);
+  }
+};

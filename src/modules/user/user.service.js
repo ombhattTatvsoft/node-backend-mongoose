@@ -1,9 +1,10 @@
+import { badRequest, notFound } from "../../common/utils/response.js";
 import userRepo from "./user.repo.js";
 
 export const createUser = async (data) => {
   const existingUser = await userRepo.findOne({ email: data.email });
   if (existingUser) {
-    throw new Error("Email already in use");
+    throw badRequest("Email already in use");
   }
   return userRepo.create(data);
 };
@@ -23,7 +24,7 @@ export const getUserById = async (id) => {
 export const updateUser = async (id, data) => {
   const existingUser = await userRepo.findById(id);
   if (!existingUser) {
-    throw new Error("User not found");
+    throw notFound("User not found");
   }
   return userRepo.updateById(id, data);
 };
@@ -31,7 +32,7 @@ export const updateUser = async (id, data) => {
 export const deleteUser = async (id) => {
   const existingUser = await userRepo.findById(id);
   if (!existingUser) {
-    throw new Error("User not found");
+    throw notFound("User not found");
   }
   return userRepo.deleteById(id);
 };

@@ -27,14 +27,14 @@ export const getProjects = async (req, res, next) => {
   }
 };
 
-// export const getProject = async (req, res, next) => {
-//   try {
-//     const project = await projectService.getProject(req.params.id);
-//     success({res,data:{project}})
-//   } catch (err) {
-//     next(err);
-//   }
-// };
+export const getProject = async (req, res, next) => {
+  try {
+    const project = await projectService.getProject(req.params.id);
+    success({res,data:{project}})
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const updateProject = async (req, res, next) => {
   try {
@@ -58,12 +58,12 @@ export const deleteProject = async (req, res, next) => {
   }
 };
 
-export const getProjectMembers = async (req, res, next) => {
-  try {
-    const projectId = req.params.id;
-    const allMembers = await projectService.getProjectMembers(projectId);
-    success({ res, data: { allMembers } });
-  } catch (err) {
-    next(err);
-  }
-};
+// export const getProjectMembers = async (req, res, next) => {
+//   try {
+//     const projectId = req.params.id;
+//     const allMembers = await projectService.getProjectMembers(projectId);
+//     success({ res, data: { allMembers } });
+//   } catch (err) {
+//     next(err);
+//   }
+// };

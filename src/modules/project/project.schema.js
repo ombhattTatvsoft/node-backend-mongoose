@@ -3,7 +3,7 @@ import { startOfToday } from "date-fns";
 
 export const projectCreateSchema = Joi.object({
   name: Joi.string().trim().max(30).required(),
-  description: Joi.string().allow("").max(200),
+  description: Joi.string().allow("").max(500),
   startDate: Joi.date().min(startOfToday()).required(),
   endDate: Joi.date().min(Joi.ref("startDate")).required(),
   status: Joi.string().valid("pending", "in-progress", "completed").required(),

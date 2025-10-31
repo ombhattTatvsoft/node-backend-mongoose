@@ -4,6 +4,8 @@ import ProjectMember from "../project/models/projectMember.model.js";
 import Task from "./task.model.js";
 import Project from "../project/models/project.model.js";
 import { forbidden, notFound } from "../../common/utils/response.js";
+import { sendNotification } from "../notification/notification.controller.js";
+import { io } from "../../server.js";
 
 const ATTACHMENT_DIR = path.join(process.cwd(), "uploads", "taskAttachments");
 
@@ -70,7 +72,12 @@ export const createTask = async (userId, data, files = []) => {
     createdBy: userId,
     updatedBy: userId,
   });
-
+  await sendNotification({
+    userId: assignee,
+    projectId,
+    type: "taskAssigned",
+    message: `A new task "${title}" has been assigned to you.`,
+  });
   return newTask;
 };
 
@@ -86,26 +93,26 @@ export const editTask = async (userId, data, files) => {
     tags,
     deletedFilenames,
   } = data;
-
   const task = await Task.findById(_id);
   if (!task) throw notFound("Task not found");
-
+  const oldAssignee = task.assignee;
   const member = await findMember(task.projectId, userId);
-  if (!isOwnerOrManager(member)) throw forbidden("You are not allowed to edit this task");
+  if (!isOwnerOrManager(member))
+    throw forbidden("You are not allowed to edit this task");
 
   const formattedTags =
     typeof tags === "string" ? tags.trim().split(/,\s+/) : tags;
 
-    Object.assign(task, {
-      title,
-      description,
-      status,
-      priority,
-      assignee,
-      dueDate,
-      tags: formattedTags,
-      updatedBy: userId,
-    });
+  Object.assign(task, {
+    title,
+    description,
+    status,
+    priority,
+    assignee,
+    dueDate,
+    tags: formattedTags,
+    updatedBy: userId,
+  });
 
   if (files.length)
     task.attachments.push(...mapFilesToAttachments(files, userId));
@@ -114,9 +121,25 @@ export const editTask = async (userId, data, files) => {
     deleteFilesFromDisk(deletedFilenames);
     task.attachments = task.attachments.filter(
       (a) => !deletedFilenames.includes(a.fileName)
-    )
+    );
   }
   await task.save();
+
+  if (oldAssignee.toString() !== assignee.toString()) {
+    await sendNotification({
+      userId: oldAssignee,
+      projectId: task.projectId,
+      type: "taskUnassigned",
+      message: `You have been unassigned from the task "${title}".`,
+    });
+    await sendNotification({
+      userId: assignee,
+      projectId: task.projectId,
+      type: "taskAssigned",
+      message: `A new task "${title}" has been assigned to you.`,
+    });
+  }
+
   return task;
 };
 
@@ -132,19 +155,25 @@ export const getTasks = async (userId, projectId) => {
     .populate("assignee", "_id name email")
     .populate("createdBy", "_id name email")
     .populate("updatedBy", "_id name email")
+    .populate("attachments.uploadedBy", "_id name email")
     .sort({ createdAt: -1 });
 
   return tasks;
 };
 
-export const getTask = async (taskId) => {
+export const getTask = async (taskId, userId) => {
   const task = await Task.findById(taskId)
     .populate("assignee", "_id name email avatar")
     .populate("createdBy", "_id name email avatar")
     .populate("updatedBy", "_id name email avatar")
     .populate("comments.user", "_id name email avatar")
+    .populate("attachments.uploadedBy", "_id name email")
     .sort({ createdAt: -1 });
-
+  const isMember = await ProjectMember.exists({projectId:task.projectId, userId: userId});
+  if (!isMember) throw forbidden("You are not allowed to view this task");
+  if (!task) throw notFound("Task not found");
+  const role = await ProjectMember.findOne({ projectId: task.projectId, userId}, 'role' );
+  task._doc.assigneeRole = role ? role.role : null;
   return task;
 };
 
@@ -178,6 +207,12 @@ export const deleteTask = async (userId, taskId) => {
   }
   deleteFilesFromDisk(task.attachments.map((a) => a.fileName));
   await Task.findByIdAndDelete(taskId);
+  await sendNotification({
+    userId: task.assignee,
+    projectId: task.projectId,
+    type: "taskDeleted",
+    message: `The task "${task.title}" assigned to you has been deleted.`,
+  });
 };
 
 export const saveTaskAttachments = async (
@@ -205,6 +240,41 @@ export const saveTaskAttachments = async (
 
   task.updatedBy = userId;
   await task.save();
+  const populatedAttachments = await Task.populate(task.attachments, {
+    path: "uploadedBy",
+    select: "_id name email",
+  });
+  io.emit("task:attachments:updated", {
+    taskId,
+    attachments: populatedAttachments,
+  });
+};
 
-  return task;
+export const addComment = async (userId, taskId, text) => {
+  const task = await Task.findById(taskId);
+  if (!task) throw notFound("Task not found");
+
+  const comment = {
+    user: userId,
+    text,
+    createdAt: new Date(),
+  };
+
+  task.comments.push(comment);
+  task.updatedBy = userId;
+  task.updatedAt = new Date();
+
+  await task.save();
+
+  const lastComment = task.comments[task.comments.length - 1];
+
+  const populatedComment = await Task.populate(lastComment, {
+    path: "user",
+    select: "_id name email avatar",
+  });
+
+  io.emit("comment:new", {
+    taskId,
+    comment: populatedComment,
+  });
 };

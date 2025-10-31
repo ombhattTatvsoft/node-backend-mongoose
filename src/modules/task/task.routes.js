@@ -13,8 +13,7 @@ router.put("/editTask", authenticate,upload.array("attachments"), taskController
 router.put("/updateTaskStatus", authenticate, taskController.updateTaskStatus);
 router.get("/getTasks/:projectId", authenticate, taskController.getTasks);
 router.delete("/deleteTask/:id", authenticate, taskController.deleteTask);
-
-router.get("/getTask/:taskId",authenticate, taskController.getTask);
+router.get("/getTask/:taskId", authenticate, taskController.getTask);
 router.put("/addComment", authenticate, taskController.addComment);
 router.put(
   "/saveAttachments",

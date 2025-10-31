@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { sendNotification } from "../notification/notification.controller.js";
 import Notification from "../notification/notification.model.js";
 import Task from "../task/task.model.js";
+import { badRequest, notFound } from "../../common/utils/response.js";
 
 export const createProject = async (userId, data) => {
   const name = data.name.trim();
@@ -17,7 +18,7 @@ export const createProject = async (userId, data) => {
     name: { $regex: `^${name}$`, $options: "i" },
   });
   if (existing)
-    throw new Error("Project with this name already exists for this user");
+    throw badRequest("Project with this name already exists for this user");
 
   const project = await projectRepo.create({ ...data, owner: userId });
   await ProjectMember.create({ projectId: project._id, userId, role: "owner" });
@@ -40,24 +41,30 @@ export const getProjects = async (userId) => {
   return { myProjects, assignedProjects };
 };
 
-export const getProjectMembers = async (projectId) => {
-  const members = await ProjectMember.find({ projectId },"_id role joinedAt userId").populate('user','_id name email avatar');
-  const pendingMembers = await ProjectInvite.find({projectId},"_id email role");
-  return { members, pendingMembers };
-};
-
-// export const getProject = async (id) => {
-//   const project = await projectRepo.findById(id);
-//   if (!project) throw new Error("project not found");
-//   return project;
+// export const getProjectMembers = async (projectId) => {
+//   const members = await ProjectMember.find(
+//     { projectId },
+//     "_id role joinedAt userId"
+//   ).populate("user", "_id name email avatar");
+//   const pendingMembers = await ProjectInvite.find(
+//     { projectId },
+//     "_id email role"
+//   );
+//   return { members, pendingMembers };
 // };
+
+export const getProject = async (id) => {
+  const projectId = new mongoose.Types.ObjectId(id);
+  const project = await projectRepo.getProjectsWithMembers({ _id: projectId });
+  return project[0];
+};
 
 export const updateProject = async (data) => {
   const projectId = data._id;
   const members = data.members || [];
 
   const project = await projectRepo.findById(projectId);
-  if (!project) throw new Error("Project not found");
+  if (!project) notFound("Project not found");
 
   const name = data.name.trim();
   const duplicate = await projectRepo.findOne({
@@ -66,7 +73,7 @@ export const updateProject = async (data) => {
     _id: { $ne: projectId },
   });
   if (duplicate)
-    throw new Error("Project with this name already exists for this user");
+    throw badRequest("Project with this name already exists for this user");
 
   const updatedProject = await projectRepo.updateById(projectId, {
     name,
@@ -84,12 +91,12 @@ export const updateProject = async (data) => {
 export const deleteProject = async (id) => {
   const existingProject = await projectRepo.findById(id);
   if (!existingProject) {
-    throw new Error("project not found");
+    throw notFound("Project not found");
   }
-  await ProjectMember.deleteMany({projectId : id});
-  await ProjectInvite.deleteMany({projectId : id});
-  await Notification.deleteMany({projectId : id});
-  await Task.deleteMany({projectId : id});
+  await ProjectMember.deleteMany({ projectId: id });
+  await ProjectInvite.deleteMany({ projectId: id });
+  await Notification.deleteMany({ projectId: id });
+  await Task.deleteMany({ projectId: id });
   return await projectRepo.deleteById(id);
 };
 
@@ -163,12 +170,22 @@ async function syncProjectMembers(project, ownerId, members) {
     }
   });
 
-  currentMembers.forEach((m) => {
-    const userIdStr = String(m.userId._id);
-    if (userIdStr !== ownerStr && !emailsSet.has(m.userId.email)) {
-      membersToRemoveIds.push(m._id);
-    }
-  });
+  await Promise.all(
+    currentMembers.map(async (m) => {
+      const userIdStr = String(m.userId._id);
+      if (userIdStr !== ownerStr && !emailsSet.has(m.userId.email)) {
+        const hasPendingTask = await Task.findOne({
+          projectId,
+          assignee: m.userId._id,
+          status: { $ne: "completed" },
+        });
+        if (hasPendingTask) {
+          throw badRequest(`Cannot remove member ${m.userId.email} with pending tasks`);
+        }
+        membersToRemoveIds.push(m._id);
+      }
+    })
+  );
 
   pendingMembers.forEach((p) => {
     if (!emailsSet.has(p.email.toLowerCase())) {
@@ -177,7 +194,7 @@ async function syncProjectMembers(project, ownerId, members) {
   });
 
   // Execute DB operations
-  if (membersToAdd.length){
+  if (membersToAdd.length) {
     await ProjectMember.insertMany(membersToAdd);
     for (const m of membersToAdd) {
       await sendNotification({
@@ -188,7 +205,7 @@ async function syncProjectMembers(project, ownerId, members) {
       });
     }
   }
-  if (membersToUpdate.length){
+  if (membersToUpdate.length) {
     await ProjectMember.bulkWrite(membersToUpdate);
     for (const update of membersToUpdate) {
       const { userId } = update.updateOne.filter;
@@ -200,12 +217,13 @@ async function syncProjectMembers(project, ownerId, members) {
         message: `Your role in project "${project.name}" has been updated to ${role}`,
       });
     }
-  };
-  if (membersToRemoveIds.length){
+  }
+  if (membersToRemoveIds.length) {
     await ProjectMember.deleteMany({ _id: { $in: membersToRemoveIds } });
     for (const m of membersToRemoveIds) {
+      const member = currentMembers.find((cm) => String(cm._id) === String(m));
       await sendNotification({
-        userId: m,
+        userId: member.userId._id,
         projectId,
         type: "removed",
         message: `You have been removed from project "${project.name}"`,
@@ -215,7 +233,7 @@ async function syncProjectMembers(project, ownerId, members) {
 
   if (invitesToAdd.length) {
     await ProjectInvite.insertMany(invitesToAdd);
-    const owner = await userRepo.findOne({ _id : ownerId });
+    const owner = await userRepo.findOne({ _id: ownerId });
     await sendProjectInviteEmails({
       invites: invitesToAdd,
       project: {

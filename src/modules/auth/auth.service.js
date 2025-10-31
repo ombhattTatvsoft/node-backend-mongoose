@@ -6,12 +6,14 @@ import jwt from "jsonwebtoken";
 import axios from "axios";
 import * as userService from "../user/user.service.js";
 import userRepo from "../user/user.repo.js";
-import { success } from "../../common/utils/response.js";
-import ProjectInvite from './../project/models/projectInvite.model.js';
-import ProjectMember from './../project/models/projectMember.model.js';
+import { badRequest, notFound, success } from "../../common/utils/response.js";
+import ProjectInvite from "./../project/models/projectInvite.model.js";
+import ProjectMember from "./../project/models/projectMember.model.js";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import { sendNotification } from "../notification/notification.controller.js";
+import projectRepo from "../project/project.repo.js";
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -23,14 +25,12 @@ const CLIENT_ID = config.google.client_id;
 const REDIRECT_URI = config.google.redirect_uri;
 const CLIENT_SECRET = config.google.client_secret;
 const FRONTEND_URL = config.cors.origin;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export const login = async (email, password, remember, res) => {
   const user = await User.findOne({ email });
-  if (!user) throw new Error("Invalid credentials");
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new Error("Invalid credentials");
+  if (!user) badRequest("Invalid credentials");
+  const valid = bcrypt.compare(password, user.password);
+  if (!valid) badRequest("Invalid credentials");
   signAndSendToken(user, remember, res);
   success({ res: res, message: "Logged in successfully", data: { user } });
 };
@@ -43,7 +43,7 @@ export const signup = async (name, email, password, res) => {
   } else if (!user.password) {
     password = await bcrypt.hash(password, 10);
     user = await userRepo.updateById(user._id, { password });
-  } else throw new Error("Email already in use");
+  } else badRequest("Invalid credentials");;
   signAndSendToken(user, false, res);
   success({ res: res, message: "Logged in successfully", data: { user } });
 };
@@ -65,45 +65,55 @@ export const googleLogin = async (code, res) => {
   // DB logic
   let user = await userService.getUserByEmail(email);
   if (!user) {
-    user = await userRepo.create({ name, email, googleId, avatar : picture });
+    user = await userRepo.create({ name, email, googleId, avatar: picture });
     addIfInvited(user);
   } else if (!user.googleId) {
-    const payload = {googleId};
-    if(!user.avatar)
-      payload = {...payload, avatar : picture}
+    const payload = { googleId };
+    if (!user.avatar) payload = { ...payload, avatar: picture };
     user = await userRepo.updateById(user._id, payload);
   }
   signAndSendToken(user, false, res);
   res.redirect(FRONTEND_URL);
 };
 
-export const changePassword = async (currentPassword, newPassword, userId, res) => {
+export const changePassword = async (
+  currentPassword,
+  newPassword,
+  userId,
+  res
+) => {
   const user = await userService.getUserById(userId);
-  if (!user) throw Error('User not found');
-  if(!user.password) throw Error('You have signed up using google, Sign up first using Password.')
+  if (!user) notFound("User not found");
+  if (!user.password)
+    throw badRequest("You have signed up using google, Sign up first using Password.");
   const isMatch = await bcrypt.compare(currentPassword, user.password);
-  if (!isMatch) throw Error('Current password is incorrect');
+  if (!isMatch) badRequest("Current password is incorrect")
   const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await userRepo.updateById(userId, { password : hashedPassword });
-  success({res,message:'Password changed successfully'});
-}
+  await userRepo.updateById(userId, { password: hashedPassword });
+  success({ res, message: "Password changed successfully" });
+};
 
-export const updateProfile = async (req,res) => {
+export const updateProfile = async (req, res) => {
   const user = await userService.getUserById(req.user._id);
   if (!user) return res.status(404).json({ message: "User not found" });
   const { name } = req.body;
   if (name) user.name = name;
   if (req.file) {
     if (user.avatar) {
-      const oldPath = path.join(process.cwd(), "uploads", "avatars", path.basename(user.avatar));
+      const oldPath = path.join(
+        process.cwd(),
+        "uploads",
+        "avatars",
+        path.basename(user.avatar)
+      );
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
     user.avatar = `/uploads/avatars/${req.file.filename}`;
   }
   await user.save();
-  success({res,message:'Profile updated successfully',data:{user}});
-}
+  success({ res, message: "Profile updated successfully", data: { user } });
+};
 
 const signAndSendToken = (user, remember, res) => {
   const payload = {
@@ -119,17 +129,27 @@ const signAndSendToken = (user, remember, res) => {
 };
 
 const addIfInvited = async (newUser) => {
-  const pendingInvites = await ProjectInvite.find({ email: newUser.email,status:"pending" });
-  if(!pendingInvites.length)
-    return;
+  const pendingInvites = await ProjectInvite.find({
+    email: newUser.email,
+    status: "pending",
+  });
+  if (!pendingInvites.length) return;
   const membersToInsert = pendingInvites.map((p) => ({
     projectId: p.projectId,
-      userId: newUser._id,
-      role: p.role,
+    userId: newUser._id,
+    role: p.role,
   }));
   await ProjectMember.insertMany(membersToInsert);
-  await ProjectInvite.updateMany(
-    { email: newUser.email, status: "pending" },
-    { $set: { status: "accepted" } }
+  for (const m of membersToInsert) {
+    const project = await projectRepo.findById(m.projectId);
+    await sendNotification({
+      userId: m.userId,
+      projectId : project._id,
+      type: "added",
+      message: `You were added to project "${project.name}" as ${m.role}`,
+    });
+  }
+  await ProjectInvite.deleteMany(
+    { email: newUser.email, status: "pending" }
   );
 };

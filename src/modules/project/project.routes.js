@@ -3,6 +3,7 @@ import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import { validate } from "../../common/middlewares/validate.middleware.js";
 import { projectCreateSchema } from "./project.schema.js";
 import * as projectController from "./project.controller.js";
+import { isMember } from './../../common/middlewares/isMember.middleware.js';
 
 const router = Router();
 
@@ -10,8 +11,7 @@ router.post('/createProject', authenticate,validate(projectCreateSchema),project
 router.get('/getProjects',authenticate,projectController.getProjects);
 router.put('/editProject', authenticate,projectController.updateProject);
 router.delete('/deleteProject/:id', authenticate,projectController.deleteProject);
-router.get('/getProjectMembers/:id',projectController.getProjectMembers);
-
-// router.get('/:id', authenticate,projectController.getProject);
+// router.get('/getProjectMembers/:id',projectController.getProjectMembers);
+router.get('/getProject/:id',authenticate,isMember,projectController.getProject);
 
 export default router;

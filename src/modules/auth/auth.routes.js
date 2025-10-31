@@ -4,7 +4,7 @@ import { loginSchema, singupSchema } from "./auth.schema.js";
 import { changePassword, COOKIE_OPTIONS, googleLogin, login, signup, updateProfile } from "./auth.service.js";
 import { authenticate } from "../../common/middlewares/auth.middleware.js";
 import config from "../../config/index.js";
-import { success } from "../../common/utils/response.js";
+import { badRequest, success } from "../../common/utils/response.js";
 import multer from "multer";
 import { createStorage } from "../../common/utils/storageCreator.utils.js";
 
@@ -13,7 +13,7 @@ const router = Router();
 const CLIENT_ID=config.google.client_id;
 const REDIRECT_URI=config.google.redirect_uri;
 
-const storage = createStorage('avatar');
+const storage = createStorage('avatars');
 
 const upload = multer({
   storage,
@@ -21,7 +21,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
     if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error("Only JPG, PNG files are allowed"));
+      return cb(badRequest("Only JPG, PNG files are allowed"));
     }
     cb(null, true);
   },

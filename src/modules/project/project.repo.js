@@ -31,7 +31,7 @@ class ProjectRepo extends BaseRepo {
                 localField: "userId",
                 foreignField: "_id",
                 as: "user",
-                pipeline: [{ $project: { _id: 1, name: 1, email: 1 } }],
+                pipeline: [{ $project: { _id: 1, name: 1, email: 1, avatar:1 } }],
               },
             },
             { $unwind: "$user" },
