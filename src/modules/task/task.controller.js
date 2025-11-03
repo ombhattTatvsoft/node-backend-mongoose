@@ -86,9 +86,8 @@ export const saveTaskAttachments = async (req, res, next) => {
 
 export const addComment = async (req, res, next) => {
   try {
-    const userId = req.user._id;
     const { taskId,text } = req.body;
-    await taskService.addComment(userId, taskId, text);
+    await taskService.addComment(req, taskId, text);
     success({ res });
   } catch (err) {
     next(err);

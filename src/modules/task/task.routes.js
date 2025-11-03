@@ -6,7 +6,9 @@ import multer from "multer";
 
 const router = Router();
 const storage = createStorage("taskAttachments");
+const commentImagesStorage = createStorage("commentImages");
 const upload = multer({ storage });
+const commentImagesupload = multer({ storage : commentImagesStorage });
 
 router.post("/createTask", authenticate,upload.array("attachments"), taskController.createTask);
 router.put("/editTask", authenticate,upload.array("attachments"), taskController.editTask);
@@ -21,5 +23,13 @@ router.put(
   upload.array("attachments"),
   taskController.saveTaskAttachments
 );
+
+router.post('/comment/image',authenticate, commentImagesupload.single('upload'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: { message: 'No file uploaded' } });
+  }
+  const imageUrl = `http://localhost:4000/api/uploads/commentImages/${req.user._id}-${req.file.originalname}`;
+  res.json({ url: imageUrl });
+});
 
 export default router;

@@ -6,6 +6,8 @@ import Project from "../project/models/project.model.js";
 import { forbidden, notFound } from "../../common/utils/response.js";
 import { sendNotification } from "../notification/notification.controller.js";
 import { io } from "../../server.js";
+import { JSDOM } from "jsdom";
+import Notification from "../notification/notification.model.js";
 
 const ATTACHMENT_DIR = path.join(process.cwd(), "uploads", "taskAttachments");
 
@@ -169,10 +171,26 @@ export const getTask = async (taskId, userId) => {
     .populate("comments.user", "_id name email avatar")
     .populate("attachments.uploadedBy", "_id name email")
     .sort({ createdAt: -1 });
-  const isMember = await ProjectMember.exists({projectId:task.projectId, userId: userId});
+  const isMember = await ProjectMember.exists({
+    projectId: task.projectId,
+    userId: userId,
+  });
   if (!isMember) throw forbidden("You are not allowed to view this task");
   if (!task) throw notFound("Task not found");
-  const role = await ProjectMember.findOne({ projectId: task.projectId, userId}, 'role' );
+  const role = await ProjectMember.findOne(
+    { projectId: task.projectId, userId },
+    "role"
+  );
+  const members = await ProjectMember.find(
+    { projectId: task.projectId },
+    "userId role"
+  ).populate("userId", "_id name email avatar");
+  task._doc.projectMembers = members.map((m) => {
+    return {
+      user: m.userId,
+      role: m.role,
+    };
+  });
   task._doc.assigneeRole = role ? role.role : null;
   return task;
 };
@@ -250,7 +268,8 @@ export const saveTaskAttachments = async (
   });
 };
 
-export const addComment = async (userId, taskId, text) => {
+export const addComment = async (req, taskId, text) => {
+  const userId = req.user._id;
   const task = await Task.findById(taskId);
   if (!task) throw notFound("Task not found");
 
@@ -265,6 +284,30 @@ export const addComment = async (userId, taskId, text) => {
   task.updatedAt = new Date();
 
   await task.save();
+
+  const dom = new JSDOM(text);
+  const mentions = [];
+  dom.window.document.querySelectorAll("span.mention").forEach((el) => {
+    const mentionedUserId = el.getAttribute("data-user-id");
+    if (mentionedUserId && mentionedUserId !== userId.toString()) {
+      mentions.push({
+        mentionedUserId,
+      });
+    }
+  });
+  for (const { mentionedUserId, mention } of mentions) {
+    await sendNotification({
+      userId: mentionedUserId,
+      projectId: task.projectId,
+      type: "mention",
+      message: `
+      <b>${req.user.name}</b> mentioned you in a comment on 
+      <a href="/tasks/${task._id}" style="color:#6D28D9; text-decoration:underline;">
+        "${task.title}"
+      </a>.
+    `,
+    });
+  }
 
   const lastComment = task.comments[task.comments.length - 1];
 
