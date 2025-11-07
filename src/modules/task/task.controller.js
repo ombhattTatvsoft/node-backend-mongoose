@@ -13,6 +13,16 @@ export const createTask = async (req, res, next) => {
   }
 };
 
+export const getTaskActivities = async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+    const activities = await taskService.getTaskActivities(taskId);
+    success({ res, data: { activities } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const editTask = async (req, res, next) => {
   try {
     const userId = req.user._id;

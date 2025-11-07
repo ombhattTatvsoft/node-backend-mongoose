@@ -32,4 +32,10 @@ router.post('/comment/image',authenticate, commentImagesupload.single('upload'),
   res.json({ url: imageUrl });
 });
 
+router.get(
+  "/getTaskActivities/:taskId",
+  authenticate,
+  taskController.getTaskActivities
+);
+
 export default router;

@@ -8,6 +8,8 @@ import { sendNotification } from "../notification/notification.controller.js";
 import { io } from "../../server.js";
 import { JSDOM } from "jsdom";
 import Notification from "../notification/notification.model.js";
+import { logActivity } from "./taskActivity.service.js";
+import TaskActivity from "./taskActivity.model.js";
 
 const ATTACHMENT_DIR = path.join(process.cwd(), "uploads", "taskAttachments");
 
@@ -74,6 +76,9 @@ export const createTask = async (userId, data, files = []) => {
     createdBy: userId,
     updatedBy: userId,
   });
+  await logActivity(newTask._id, userId, "created", {
+    title: newTask.title,
+  });
   await sendNotification({
     userId: assignee,
     projectId,
@@ -128,6 +133,10 @@ export const editTask = async (userId, data, files) => {
   await task.save();
 
   if (oldAssignee.toString() !== assignee.toString()) {
+    await logActivity(task._id, userId, "assigneeChanged", {
+      from: oldAssignee,
+      to: assignee,
+    });
     await sendNotification({
       userId: oldAssignee,
       projectId: task.projectId,
@@ -141,7 +150,9 @@ export const editTask = async (userId, data, files) => {
       message: `A new task "${title}" has been assigned to you.`,
     });
   }
-
+  await logActivity(task._id, userId, "updated", {
+    title: task.title,
+  });
   return task;
 };
 
@@ -206,9 +217,15 @@ export const updateTaskStatus = async (userId, taskId, newStatus) => {
     throw forbidden("You are not allowed to update the status of this task");
   }
 
+  const oldStatus = task.status;
   task.status = newStatus;
   task.updatedBy = userId;
   await task.save();
+
+  await logActivity(task._id, userId, "statusChanged", {
+    from: oldStatus,
+    to: newStatus,
+  });
 
   return task;
 };
@@ -225,6 +242,9 @@ export const deleteTask = async (userId, taskId) => {
   }
   deleteFilesFromDisk(task.attachments.map((a) => a.fileName));
   await Task.findByIdAndDelete(taskId);
+  await logActivity(task._id, userId, "deleted", {
+    title: task.title,
+  });
   await sendNotification({
     userId: task.assignee,
     projectId: task.projectId,
@@ -250,10 +270,16 @@ export const saveTaskAttachments = async (
     task.attachments = task.attachments.filter(
       (a) => !deletedFilenames.includes(a.fileName)
     );
+    await logActivity(taskId, userId, "attachmentRemoved", {
+      count: deletedFilenames.length,
+    });
   }
 
   if (files.length) {
     task.attachments.push(...mapFilesToAttachments(files, userId));
+    await logActivity(taskId, userId, "attachmentAdded", {
+      count: files.length,
+    });
   }
 
   task.updatedBy = userId;
@@ -284,6 +310,8 @@ export const addComment = async (req, taskId, text) => {
   task.updatedAt = new Date();
 
   await task.save();
+
+  await logActivity(taskId, userId, "commented");
 
   const dom = new JSDOM(text);
   const mentions = [];
@@ -320,4 +348,11 @@ export const addComment = async (req, taskId, text) => {
     taskId,
     comment: populatedComment,
   });
+};
+
+export const getTaskActivities = async (taskId) => {
+  const activities = await TaskActivity.find({ taskId })
+    .populate("userId", "_id name email avatar")
+    .sort({ createdAt: -1 });
+  return activities;
 };
