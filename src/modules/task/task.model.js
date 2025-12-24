@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { TaskFieldsEnum } from "../../Const/enums.js";
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -70,5 +71,28 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const taskActivitySchema = new mongoose.Schema(
+  {
+    taskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+      required: true,
+    },
+    performedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    performedAt: { type: Date, default: Date.now },
+    action: new mongoose.Schema({
+        field : { type: String, enum: Object.values(TaskFieldsEnum),required: true },
+        oldValue : { type: mongoose.Schema.Types.Mixed },
+        newValue : { type: mongoose.Schema.Types.Mixed },
+      })
+  }
+);
+
 const Task = mongoose.model("Task", taskSchema);
-export default Task;
+const TaskActivity = mongoose.model("TaskActivity", taskActivitySchema);
+
+export { Task, TaskActivity };

@@ -47,6 +47,16 @@ export const getTask = async (req, res, next) => {
   }
 };
 
+export const getTaskActivity = async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+    const taskActivity = await taskService.getTaskActivity(taskId);
+    success({ res, data: { taskActivity } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const updateTaskStatus = async (req, res, next) => {
   try {
     const userId = req.user._id;

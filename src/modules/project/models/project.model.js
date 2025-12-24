@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ProjectStatusEnum } from './../../../Const/enums.js';
 
 const projectSchema = new mongoose.Schema(
   {
@@ -8,7 +9,7 @@ const projectSchema = new mongoose.Schema(
     endDate: { type: Date, required: true },
     status: {
       type: String,
-      enum: ["pending", "in-progress", "completed"],
+      enum: Object.values(ProjectStatusEnum),
       required: true,
     },
     owner: {

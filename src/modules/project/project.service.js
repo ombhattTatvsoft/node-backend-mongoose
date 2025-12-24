@@ -8,7 +8,7 @@ import { sendEmail } from "../../common/utils/emailService.util.js";
 import { format } from "date-fns";
 import { sendNotification } from "../notification/notification.controller.js";
 import Notification from "../notification/notification.model.js";
-import Task from "../task/task.model.js";
+import { Task } from "../task/task.model.js";
 import { badRequest, notFound } from "../../common/utils/response.js";
 
 export const createProject = async (userId, data) => {

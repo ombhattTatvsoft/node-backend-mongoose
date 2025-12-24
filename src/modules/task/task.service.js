@@ -1,13 +1,14 @@
 import fs from "fs";
 import path from "path";
 import ProjectMember from "../project/models/projectMember.model.js";
-import Task from "./task.model.js";
+import { Task, TaskActivity } from "./task.model.js";
 import Project from "../project/models/project.model.js";
 import { forbidden, notFound } from "../../common/utils/response.js";
 import { sendNotification } from "../notification/notification.controller.js";
 import { io } from "../../server.js";
 import { JSDOM } from "jsdom";
 import Notification from "../notification/notification.model.js";
+import { TaskFieldsEnum } from "../../Const/enums.js";
 
 const ATTACHMENT_DIR = path.join(process.cwd(), "uploads", "taskAttachments");
 
@@ -74,6 +75,11 @@ export const createTask = async (userId, data, files = []) => {
     createdBy: userId,
     updatedBy: userId,
   });
+  await TaskActivity.create({
+    taskId: newTask._id,
+    performedBy: userId,
+    performedAt: newTask.createdAt,
+  });
   await sendNotification({
     userId: assignee,
     projectId,
@@ -105,6 +111,7 @@ export const editTask = async (userId, data, files) => {
   const formattedTags =
     typeof tags === "string" ? tags.trim().split(/,\s+/) : tags;
 
+  const original = task.toObject({ depopulate: true });
   Object.assign(task, {
     title,
     description,
@@ -125,6 +132,7 @@ export const editTask = async (userId, data, files) => {
       (a) => !deletedFilenames.includes(a.fileName)
     );
   }
+  await taskActivityLogger(task, original, userId);
   await task.save();
 
   if (oldAssignee.toString() !== assignee.toString()) {
@@ -195,10 +203,15 @@ export const getTask = async (taskId, userId) => {
   return task;
 };
 
+export const getTaskActivity = async (taskId) => {
+  return TaskActivity.find({ taskId }).populate("performedBy", "_id name email avatar").sort({ performedAt: -1  });
+};
+
 export const updateTaskStatus = async (userId, taskId, newStatus) => {
   const task = await Task.findById(taskId);
   if (!task) throw notFound("Task not found");
 
+  const original = task.toObject({ depopulate: true });
   const member = await findMember(task.projectId, userId);
   const isAssignee = task.assignee.toString() === userId.toString();
 
@@ -208,6 +221,7 @@ export const updateTaskStatus = async (userId, taskId, newStatus) => {
 
   task.status = newStatus;
   task.updatedBy = userId;
+  await taskActivityLogger(task, original, userId);
   await task.save();
 
   return task;
@@ -242,6 +256,7 @@ export const saveTaskAttachments = async (
   const task = await Task.findById(taskId);
   if (!task) throw notFound("Task not found");
 
+  const original = task.toObject({ depopulate: true });
   const allowed = await canModifyTask(task, userId);
   if (!allowed) throw forbidden("You are not allowed to modify attachments");
 
@@ -257,6 +272,7 @@ export const saveTaskAttachments = async (
   }
 
   task.updatedBy = userId;
+  await taskActivityLogger(task, original, userId);
   await task.save();
   const populatedAttachments = await Task.populate(task.attachments, {
     path: "uploadedBy",
@@ -320,4 +336,60 @@ export const addComment = async (req, taskId, text) => {
     taskId,
     comment: populatedComment,
   });
+};
+
+const taskActivityLogger = async(task, original, userId) => {
+  let activityToAdd = [];
+  task.modifiedPaths().forEach((field) => {
+    if (Object.values(TaskFieldsEnum).includes(field)) {
+      if(field == TaskFieldsEnum.ATTACHMENT){
+        const oldAttachments = original.attachments.map(a => a.originalName);
+        const newAttachments = task.attachments.map(a => a.originalName);
+        const addedAttachments = newAttachments.filter(a => !oldAttachments.includes(a));
+        const removedAttachments = oldAttachments.filter(a => !newAttachments.includes(a));
+        if(addedAttachments.length>0){
+          activityToAdd.push(
+            new TaskActivity({
+              taskId: task._id,
+              performedBy: userId,
+              performedAt: new Date(),
+              action: {
+                field,
+                oldValue: null,
+                newValue: `Added attachments: ${addedAttachments.join(", ")}`,
+              },
+            })
+          );
+        }
+        if(removedAttachments.length>0){
+          activityToAdd.push(
+            new TaskActivity({
+              taskId: task._id,
+              performedBy: userId,
+              performedAt: new Date(),
+              action: {
+                field,
+                oldValue: `Removed attachments: ${removedAttachments.join(", ")}`,
+                newValue: null,
+              },
+            })
+          );
+        }
+        return;
+      }
+      activityToAdd.push(
+        new TaskActivity({
+          taskId: task._id,
+          performedBy: userId,
+          performedAt: new Date(),
+          action: {
+            field,
+            oldValue: original[field],
+            newValue: task[field],
+          },
+        })
+      );
+    }
+  });
+  await TaskActivity.insertMany(activityToAdd);
 };

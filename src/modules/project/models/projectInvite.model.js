@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { InvitationStatusEnum, ProjectRoleEnum } from "../../../Const/enums.js";
 
 const projectInviteSchema = new mongoose.Schema(
   {
@@ -15,8 +16,8 @@ const projectInviteSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["manager", "developer", "tester"],
-      default: "developer",
+      enum: Object.values(ProjectRoleEnum),
+      default: ProjectRoleEnum.DEVELOPER,
     },
     invitedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -25,8 +26,8 @@ const projectInviteSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
-      default: "pending",
+      enum: Object.values(InvitationStatusEnum),
+      default: InvitationStatusEnum.PENDING,
     },
     invitedAt: { type: Date, default: Date.now },
   },

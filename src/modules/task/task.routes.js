@@ -16,6 +16,7 @@ router.put("/updateTaskStatus", authenticate, taskController.updateTaskStatus);
 router.get("/getTasks/:projectId", authenticate, taskController.getTasks);
 router.delete("/deleteTask/:id", authenticate, taskController.deleteTask);
 router.get("/getTask/:taskId", authenticate, taskController.getTask);
+router.get("/getTaskActivity/:taskId", taskController.getTaskActivity);
 router.put("/addComment", authenticate, taskController.addComment);
 router.put(
   "/saveAttachments",

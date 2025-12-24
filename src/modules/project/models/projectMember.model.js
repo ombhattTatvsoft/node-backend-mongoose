@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ProjectRoleEnum } from "../../../Const/enums.js";
 
 const projectMemberSchema = new mongoose.Schema(
   {
@@ -14,8 +15,8 @@ const projectMemberSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["owner", "manager", "developer", "tester"],
-      default: "developer",
+      enum: Object.values(ProjectRoleEnum),
+      default: ProjectRoleEnum.DEVELOPER,
     },
     joinedAt: { type: Date, default: Date.now },
   },
