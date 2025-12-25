@@ -1,11 +1,13 @@
 import { success } from "../../common/utils/response.js";
 import * as projectService from "./project.service.js";
+import * as projectConfigService from "../projectConfig/projectConfig.service.js";
 
 export const createProject = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const projectData = req.body;
     const project = await projectService.createProject(userId, projectData);
+    await projectConfigService.createProjectConfig(project);
     success({
       res,
       status: 201,

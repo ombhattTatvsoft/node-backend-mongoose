@@ -3,12 +3,13 @@ import path from "path";
 import ProjectMember from "../project/models/projectMember.model.js";
 import { Task, TaskActivity } from "./task.model.js";
 import Project from "../project/models/project.model.js";
-import { forbidden, notFound } from "../../common/utils/response.js";
+import { badRequest, forbidden, notFound } from "../../common/utils/response.js";
 import { sendNotification } from "../notification/notification.controller.js";
 import { io } from "../../server.js";
 import { JSDOM } from "jsdom";
-import Notification from "../notification/notification.model.js";
 import { TaskFieldsEnum } from "../../Const/enums.js";
+import { ProjectConfig } from "../projectConfig/projectConfig.model.js";
+import User from "../user/user.model.js";
 
 const ATTACHMENT_DIR = path.join(process.cwd(), "uploads", "taskAttachments");
 
@@ -54,9 +55,13 @@ export const createTask = async (userId, data, files = []) => {
     tags,
   } = data;
 
+  const projectConfig = await ProjectConfig.findOne({projectId}).lean();
   const member = await findMember(projectId, userId);
   if (!isOwnerOrManager(member))
     throw forbidden("You are not allowed to create task for this project");
+
+  if(projectConfig.TaskStages.find(stage => stage._id.toString() == status.toString() && stage.isActive) == null)
+    throw badRequest("Status might be disabled or removed for this project");
 
   const formattedTags =
     typeof tags === "string" ? tags.trim().split(/,\s+/) : tags;
@@ -102,11 +107,15 @@ export const editTask = async (userId, data, files) => {
     deletedFilenames,
   } = data;
   const task = await Task.findById(_id);
+  const projectConfig = await ProjectConfig.findOne({projectId: task.projectId}).lean();
   if (!task) throw notFound("Task not found");
   const oldAssignee = task.assignee;
   const member = await findMember(task.projectId, userId);
   if (!isOwnerOrManager(member))
     throw forbidden("You are not allowed to edit this task");
+
+  if(projectConfig.TaskStages.find(stage => stage._id.toString() == status.toString() && stage.isActive) == null)
+    throw badRequest("Status might be disabled or removed for this project");
 
   const formattedTags =
     typeof tags === "string" ? tags.trim().split(/,\s+/) : tags;
@@ -179,6 +188,8 @@ export const getTask = async (taskId, userId) => {
     .populate("comments.user", "_id name email avatar")
     .populate("attachments.uploadedBy", "_id name email")
     .sort({ createdAt: -1 });
+  const projectConfig = await ProjectConfig.findOne({projectId: task.projectId})
+  task.status = projectConfig.TaskStages.find(stage => stage._id.toString() === task.status).name;
   const isMember = await ProjectMember.exists({
     projectId: task.projectId,
     userId: userId,
@@ -211,6 +222,7 @@ export const updateTaskStatus = async (userId, taskId, newStatus) => {
   const task = await Task.findById(taskId);
   if (!task) throw notFound("Task not found");
 
+  const projectConfig = await ProjectConfig.findOne({projectId: task.projectId}).lean();
   const original = task.toObject({ depopulate: true });
   const member = await findMember(task.projectId, userId);
   const isAssignee = task.assignee.toString() === userId.toString();
@@ -218,6 +230,8 @@ export const updateTaskStatus = async (userId, taskId, newStatus) => {
   if (!isOwnerOrManager(member) && !isAssignee) {
     throw forbidden("You are not allowed to update the status of this task");
   }
+  if(projectConfig.TaskStages.find(stage => stage._id.toString() == newStatus.toString() && stage.isActive) == null)
+    throw badRequest("Status might be disabled or removed for this project");
 
   task.status = newStatus;
   task.updatedBy = userId;
@@ -239,6 +253,7 @@ export const deleteTask = async (userId, taskId) => {
   }
   deleteFilesFromDisk(task.attachments.map((a) => a.fileName));
   await Task.findByIdAndDelete(taskId);
+  await TaskActivity.deleteMany({ taskId });
   await sendNotification({
     userId: task.assignee,
     projectId: task.projectId,
@@ -338,10 +353,14 @@ export const addComment = async (req, taskId, text) => {
   });
 };
 
-const taskActivityLogger = async(task, original, userId) => {
+const taskActivityLogger = async (task, original, userId) => {
+  const projectConfig = await ProjectConfig.findOne({projectId: task.projectId});
   let activityToAdd = [];
-  task.modifiedPaths().forEach((field) => {
+  const modifiedFields = task.modifiedPaths();
+  for(const field of modifiedFields){
     if (Object.values(TaskFieldsEnum).includes(field)) {
+      let oldValue = original[field];
+      let newValue = task[field];
       if(field == TaskFieldsEnum.ATTACHMENT){
         const oldAttachments = original.attachments.map(a => a.originalName);
         const newAttachments = task.attachments.map(a => a.originalName);
@@ -375,7 +394,15 @@ const taskActivityLogger = async(task, original, userId) => {
             })
           );
         }
-        return;
+        continue;
+      }
+      if(field == TaskFieldsEnum.STATUS){
+        oldValue = findStatusName(projectConfig, oldValue);
+        newValue = findStatusName(projectConfig, newValue);
+      }
+      if(field == TaskFieldsEnum.ASSIGNEE){
+        oldValue = await User.findById(oldValue).then(u => u.name);
+        newValue = await User.findById(newValue).then(u => u.name);
       }
       activityToAdd.push(
         new TaskActivity({
@@ -384,12 +411,19 @@ const taskActivityLogger = async(task, original, userId) => {
           performedAt: new Date(),
           action: {
             field,
-            oldValue: original[field],
-            newValue: task[field],
+            oldValue: oldValue,
+            newValue: newValue,
           },
         })
       );
     }
-  });
+  }
   await TaskActivity.insertMany(activityToAdd);
 };
+
+const findStatusName = (projectConfig, statusId) => {
+  const status = projectConfig.TaskStages.find(
+    (stage) => stage._id.toString() === statusId.toString()
+  );
+  return status ? status.name : statusId;
+}

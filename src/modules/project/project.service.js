@@ -8,8 +8,9 @@ import { sendEmail } from "../../common/utils/emailService.util.js";
 import { format } from "date-fns";
 import { sendNotification } from "../notification/notification.controller.js";
 import Notification from "../notification/notification.model.js";
-import { Task } from "../task/task.model.js";
+import { Task, TaskActivity } from "../task/task.model.js";
 import { badRequest, notFound } from "../../common/utils/response.js";
+import { ProjectConfig } from "../projectConfig/projectConfig.model.js";
 
 export const createProject = async (userId, data) => {
   const name = data.name.trim();
@@ -96,7 +97,10 @@ export const deleteProject = async (id) => {
   await ProjectMember.deleteMany({ projectId: id });
   await ProjectInvite.deleteMany({ projectId: id });
   await Notification.deleteMany({ projectId: id });
+  const taskIds = await Task.find({ projectId: id }).distinct("_id");
   await Task.deleteMany({ projectId: id });
+  await TaskActivity.deleteMany({ taskId: { $in: taskIds } });
+  await ProjectConfig.deleteOne({ projectId: id });
   return await projectRepo.deleteById(id);
 };
 
@@ -174,10 +178,11 @@ async function syncProjectMembers(project, ownerId, members) {
     currentMembers.map(async (m) => {
       const userIdStr = String(m.userId._id);
       if (userIdStr !== ownerStr && !emailsSet.has(m.userId.email)) {
+        const completedStatusId = await ProjectConfig.findOne({projectId}).then(config => config.TaskStages.find(stage => stage.name === 'Completed')._id);
         const hasPendingTask = await Task.findOne({
           projectId,
           assignee: m.userId._id,
-          status: { $ne: "completed" },
+          status: { $ne: completedStatusId },
         });
         if (hasPendingTask) {
           throw badRequest(`Cannot remove member ${m.userId.email} with pending tasks`);

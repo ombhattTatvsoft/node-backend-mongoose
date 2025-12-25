@@ -1,13 +1,11 @@
 import { Router } from "express";
 import { authenticate } from "../../common/middlewares/auth.middleware.js";
-import { validate } from "../../common/middlewares/validate.middleware.js";
-import { projectCreateSchema } from "./project.schema.js";
 import * as projectController from "./project.controller.js";
 import { isMember } from './../../common/middlewares/isMember.middleware.js';
 
 const router = Router();
 
-router.post('/createProject', authenticate,validate(projectCreateSchema),projectController.createProject);
+router.post('/createProject', authenticate,projectController.createProject);
 router.get('/getProjects',authenticate,projectController.getProjects);
 router.put('/editProject', authenticate,projectController.updateProject);
 router.delete('/deleteProject/:id', authenticate,projectController.deleteProject);

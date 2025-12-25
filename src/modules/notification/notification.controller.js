@@ -17,7 +17,6 @@ export const getNotifications = async (req, res ,next) => {
 export const markAllAsRead = async (req, res) => {
   try {
     const userId = req.user._id;
-    // await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
     await Notification.deleteMany({ userId});
     success({res,message:'All notifications marked as read'});
   } catch (err) {
